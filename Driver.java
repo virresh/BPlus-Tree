@@ -357,22 +357,27 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 			if(loc>=0)
 				childIndex=loc+1;
 			else
-				childIndex=-loc-1;
+				childIndex=(0-(loc+1));
 			return children.get(childIndex);
 		}
 		
 		void delete_Child(K key) {
 			int loc = Collections.binarySearch(keys,key);
-			if (loc >= 0) {
-				keys.remove(loc);
-				children.remove(loc + 1);
-			}
+			if(loc<0)
+				return;
+			children.remove(loc + 1);
+			keys.remove(loc);
 		}
 
 		void insertChild(K key, Node child) {
 			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			if (loc < 0) {
+			int childIndex;
+			if(loc>=0)
+				childIndex=loc+1;
+			else
+				childIndex=(0-(loc+1));
+			if (loc < 0) 
+			{
 				keys.add(childIndex, key);
 				children.add(childIndex + 1, child);
 			} 
@@ -381,22 +386,30 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 			}
 		}
 
-		Node getChildLeftSibling(K key) {
+		Node getChildLeftSibling(K key) 
+		{
 			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			if (childIndex > 0)
-				return children.get(childIndex - 1);
-
-			return null;
+			int childIndex;
+			if(loc>=0)
+				childIndex=loc+1;
+			else
+				childIndex=(0-(loc+1));
+			if (childIndex <= 0)
+				return null;
+			return children.get(childIndex - 1);
 		}
 
-		Node getChildRightSibling(K key) {
+		Node getChildRightSibling(K key) 
+		{
 			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			if (childIndex < keyNum())
-				return children.get(childIndex + 1);
-
-			return null;
+			int childIndex;
+			if(loc>=0)
+				childIndex=loc+1;
+			else
+				childIndex=(0-(loc+1));
+			if (childIndex >= keyNum())
+				return null;
+			return children.get(childIndex + 1);
 		}
 		
 		@Override
@@ -801,4 +814,3 @@ class DataNode {
 		return String.format("%010d",salary);
 	}
 }
-
