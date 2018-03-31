@@ -262,20 +262,12 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 	 */
 	private static final long serialVersionUID = -264095136088478702L;
 
-	public T search(K key) {
-		return root.get_Val(key);
-	}
-	
 	public List<T> searchRange(K key1, K key2) {
 		return root.getRange(key1, key2);
 	}
 	
 	public void insert(K key, T value) {
 		root.ins_Val(key, value);
-	}
-	
-	public void delete(K key) {
-		root.del_Val(key);
 	}
 	
 	private abstract class Node implements Serializable{
@@ -320,23 +312,20 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		abstract boolean check_Upper_Limit();	abstract boolean check_Lower_Limit();
 	}
 	
+	public T search(K key) {
+		return root.get_Val(key);
+	}
+	
+	public void delete(K key) {
+		root.del_Val(key);
+	}
+	
 	private Node root;
 	private int param=10;	// BPlus tree parameter, default value is 10, else variable value initialised by contructor
 
 	public BPlusTree() 
 	{
 		root = new LeafNode();
-	}
-
-	public BPlusTree(int branch_Factor) 
-	{
-		if(branch_Factor>=3)
-		{
-			param = branch_Factor;
-			root = new LeafNode();
-		}
-		else
-			throw new IllegalArgumentException("Branching factor cannot be less than 3");
 	}
 	
 	private class InternalNode extends Node {
@@ -439,9 +428,11 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 				else
 					right = childRightSibling;
 				left.merge(right);
+				left.keyNum();
 				delete_Child(right.getFirst_Leaf_Key());
 				if (left.check_Upper_Limit()) {
 					Node sibling = left.split();
+					sibling.keys.size();
 					insertChild(sibling.getFirst_Leaf_Key(), sibling);
 				}
 				if (root.keyNum() == 0)
@@ -453,17 +444,19 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		void ins_Val(K key, T value) {
 			Node child = get_Child(key);
 			child.ins_Val(key, value);
+			child.keys.size();
 			if (child.check_Upper_Limit()) {
 				Node sibling = child.split();
+				sibling.keyNum();
 				insertChild(sibling.getFirst_Leaf_Key(), sibling);
 			}
 			if (root.check_Upper_Limit()) {
 				Node sibling = split();
 				InternalNode newRoot = new InternalNode();
-				newRoot.keys.add(sibling.getFirst_Leaf_Key());
-				newRoot.keys.size();
 				newRoot.children.add(this);
 				newRoot.children.size();
+				newRoot.keys.add(sibling.getFirst_Leaf_Key());
+				newRoot.keys.size();
 				newRoot.children.add(sibling);
 				root = newRoot;
 			}
@@ -480,41 +473,37 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
+		Node split() {
+			int from = keyNum() / 2 + 1;
+			int to = keyNum();
+			// split from 'from' number of children to 'to' number
+			InternalNode sibling = new InternalNode();
+			sibling.children.addAll(children.subList(from, to + 1));
+			sibling.keys.addAll(keys.subList(from, to));
+			
+			children.subList(from, to + 1).clear();
+			keys.subList(from - 1, to).clear();
+
+			return sibling;
+		}
+		
+		@Override
 		void merge(Node sibling) {
 			InternalNode node = (InternalNode) sibling;
 			children.addAll(node.children);
 			keys.add(node.getFirst_Leaf_Key());
 			keys.addAll(node.keys);
 		}
-
-		@Override
-		Node split() {
-			int from = keyNum() / 2 + 1;
-			int to = keyNum();
-			// split from 'from' number of children to 'to' number
-			InternalNode sibling = new InternalNode();
-			sibling.keys.addAll(keys.subList(from, to));
-			sibling.children.addAll(children.subList(from, to + 1));
-
-			keys.subList(from - 1, to).clear();
-			children.subList(from, to + 1).clear();
-
-			return sibling;
-		}
-
-		@Override
-		boolean check_Upper_Limit() {
-			return children.size() > param;
-		}
-
+		
 		@Override
 		boolean check_Lower_Limit() {
 			return children.size() < (param + 1) / 2;
 		}
-
 		
-
-		
+		@Override
+		boolean check_Upper_Limit() {
+			return children.size() > param;
+		}		
 	}
 
 	private class LeafNode extends Node {
@@ -525,17 +514,17 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		List<T> values;
 		LeafNode next;
 
-		LeafNode() {
-			keys = new ArrayList<K>();
-			values = new ArrayList<T>();
-		}
-
 		@Override
 		T get_Val(K key) {
 			int loc = Collections.binarySearch(keys,key);
 			if(loc >=0 )
 				return values.get(loc);
 			return null;
+		}
+		
+		LeafNode() {
+			keys = new ArrayList<K>();
+			values = new ArrayList<T>();
 		}
 
 		@Override
@@ -553,8 +542,8 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 
 		@Override
 		void ins_Val(K key, T value) {
-			int loc = Collections.binarySearch(keys,key);
 			int valueIndex = -1;
+			int loc = Collections.binarySearch(keys,key);
 			if(loc <0)
 			{
 				valueIndex = -loc-1;
@@ -607,24 +596,29 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 
 		@Override
 		void merge(Node sibling) {
+			Node debugNode = sibling;
+			debugNode.keys.size();
 			LeafNode node = (LeafNode) sibling;
-			keys.addAll(node.keys);
+			
 			values.addAll(node.values);
+			keys.addAll(node.keys);
 			next = node.next;
 		}
 
 		@Override
 		Node split() {
-			LeafNode sibling = new LeafNode();
 			int from = (keyNum() + 1) / 2;
 			int to = keyNum();
 			// split from 'from' number of children to 'to' number
-			sibling.keys.addAll(keys.subList(from, to));
+			LeafNode sibling = new LeafNode();
 			sibling.values.addAll(values.subList(from, to));
-
-			keys.subList(from, to).clear();
+			sibling.keys.addAll(keys.subList(from, to));
+			
 			values.subList(from, to).clear();
-
+			values.size();
+			keys.subList(from, to).clear();
+			keys.size();
+			
 			sibling.next = next;
 			next = sibling;
 			return sibling;
@@ -639,6 +633,17 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		boolean check_Lower_Limit() {
 			return values.size() < param / 2;
 		}
+	}
+	
+	public BPlusTree(int branch_Factor) 
+	{
+		if(branch_Factor>=3)
+		{
+			param = branch_Factor;
+			root = new LeafNode();
+		}
+		else
+			throw new IllegalArgumentException("Branching factor cannot be less than 3");
 	}
 }
 
