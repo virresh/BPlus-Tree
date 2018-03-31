@@ -86,6 +86,7 @@ public class Driver {
 				insertData();
 				try {
 					writeTreeToFile();
+					DataFileReader.saveData();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -94,6 +95,7 @@ public class Driver {
 				deleteRecord();
 				try {
 					writeTreeToFile();
+					DataFileReader.saveData();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -131,8 +133,8 @@ public class Driver {
 	{
 		System.out.println("Adding new data Entry:");
 		DataNode dn = DataFileReader.addRecord();
-		NUM_RECS++;
 		addToBPlusTree(dn,NUM_RECS);
+		NUM_RECS++;
 	}
 	
 	static void rangeFind()
