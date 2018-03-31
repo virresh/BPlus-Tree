@@ -378,8 +378,10 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 				childIndex=(0-(loc+1));
 			if (loc < 0) 
 			{
-				keys.add(childIndex, key);
 				children.add(childIndex + 1, child);
+				children.size();
+				keys.add(childIndex, key);
+				keys.size();
 			} 
 			else {
 				children.set(childIndex, child);
@@ -425,10 +427,17 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 			
 			// check if underflow after deletion
 			if (child.check_Lower_Limit()) {
+				Node left,right;
 				Node childLeftSibling = getChildLeftSibling(key);
-				Node left = childLeftSibling != null ? childLeftSibling : child;
 				Node childRightSibling = getChildRightSibling(key);
-				Node right = childLeftSibling != null ? child: childRightSibling;
+				if(childLeftSibling == null)
+					left = child;
+				else
+					left = childLeftSibling;
+				if(childRightSibling == null)
+					right = child;
+				else
+					right = childRightSibling;
 				left.merge(right);
 				delete_Child(right.getFirst_Leaf_Key());
 				if (left.check_Upper_Limit()) {
@@ -452,7 +461,9 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 				Node sibling = split();
 				InternalNode newRoot = new InternalNode();
 				newRoot.keys.add(sibling.getFirst_Leaf_Key());
+				newRoot.keys.size();
 				newRoot.children.add(this);
+				newRoot.children.size();
 				newRoot.children.add(sibling);
 				root = newRoot;
 			}
@@ -471,10 +482,9 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		@Override
 		void merge(Node sibling) {
 			InternalNode node = (InternalNode) sibling;
+			children.addAll(node.children);
 			keys.add(node.getFirst_Leaf_Key());
 			keys.addAll(node.keys);
-			children.addAll(node.children);
-
 		}
 
 		@Override
@@ -523,22 +533,37 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		@Override
 		T get_Val(K key) {
 			int loc = Collections.binarySearch(keys,key);
-			return loc >= 0 ? values.get(loc) : null;
+			if(loc >=0 )
+				return values.get(loc);
+			return null;
 		}
 
 		@Override
 		void del_Val(K key) {
 			int loc = Collections.binarySearch(keys,key);
+			if(loc<0)
+				return;
 			if (loc >= 0) {
 				keys.remove(loc);
+				keys.size();
 				values.remove(loc);
+				values.size();
 			}
 		}
 
 		@Override
 		void ins_Val(K key, T value) {
 			int loc = Collections.binarySearch(keys,key);
-			int valueIndex = loc >= 0 ? loc : -loc - 1;
+			int valueIndex = -1;
+			if(loc <0)
+			{
+				valueIndex = -loc-1;
+			}
+			else
+			{
+				valueIndex = loc;
+			}
+			
 			if (loc >= 0) {
 				values.set(valueIndex, value);
 			} else {
@@ -550,6 +575,8 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 				InternalNode newRoot = new InternalNode();
 				newRoot.keys.add(sibling.getFirst_Leaf_Key());
 				newRoot.children.add(this);
+				Node debSib = sibling;
+				debSib.keys.size();
 				newRoot.children.add(sibling);
 				root = newRoot;
 			}
