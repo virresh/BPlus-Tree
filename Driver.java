@@ -464,7 +464,8 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 
 		@Override
 		K getFirst_Leaf_Key() {
-			return children.get(0).getFirst_Leaf_Key();
+			Node first_child = children.get(0);
+			return first_child.getFirst_Leaf_Key();
 		}
 
 		@Override
@@ -478,11 +479,15 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 			int to = keyNum();
 			// split from 'from' number of children to 'to' number
 			InternalNode sibling = new InternalNode();
-			sibling.children.addAll(children.subList(from, to + 1));
-			sibling.keys.addAll(keys.subList(from, to));
 			
-			children.subList(from, to + 1).clear();
-			keys.subList(from - 1, to).clear();
+			List<K> keys_sub=  keys.subList(from, to);
+			List<Node> child_sub = children.subList(from, to + 1);
+			
+			sibling.children.addAll(child_sub);
+			sibling.keys.addAll(keys_sub);
+			
+			child_sub.clear();
+			keys_sub.clear();
 
 			return sibling;
 		}
@@ -497,12 +502,18 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		
 		@Override
 		boolean check_Lower_Limit() {
-			return children.size() < (param + 1) / 2;
+			int n = children.size();
+			if(n < (param+1)/2)
+				return true;
+			return false;
 		}
 		
 		@Override
 		boolean check_Upper_Limit() {
-			return children.size() > param;
+			int n = children.size();
+			if(param<n)
+				return true;
+			return false;
 		}		
 	}
 
