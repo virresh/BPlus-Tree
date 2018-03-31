@@ -560,7 +560,7 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 			}
 			else
 			{
-				values.set(valueIndex, value)
+				values.set(valueIndex, value);
 			}
 			
 			if (root.check_Upper_Limit()) {
