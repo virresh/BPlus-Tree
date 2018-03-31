@@ -426,10 +426,9 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 			// check if underflow after deletion
 			if (child.check_Lower_Limit()) {
 				Node childLeftSibling = getChildLeftSibling(key);
-				Node childRightSibling = getChildRightSibling(key);
 				Node left = childLeftSibling != null ? childLeftSibling : child;
-				Node right = childLeftSibling != null ? child
-						: childRightSibling;
+				Node childRightSibling = getChildRightSibling(key);
+				Node right = childLeftSibling != null ? child: childRightSibling;
 				left.merge(right);
 				delete_Child(right.getFirst_Leaf_Key());
 				if (left.check_Upper_Limit()) {
