@@ -553,12 +553,16 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 				valueIndex = loc;
 			}
 			
-			if (loc >= 0) {
-				values.set(valueIndex, value);
-			} else {
+			if(loc < 0)
+			{
 				keys.add(valueIndex, key);
 				values.add(valueIndex, value);
 			}
+			else
+			{
+				values.set(valueIndex, value)
+			}
+			
 			if (root.check_Upper_Limit()) {
 				Node sibling = split();
 				InternalNode newRoot = new InternalNode();
