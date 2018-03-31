@@ -1,18 +1,18 @@
+import java.util.ArrayList;
 import java.io.BufferedReader;
+import java.util.Collections;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.List;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
-import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 
 public class Driver {
 	
@@ -50,11 +50,12 @@ public class Driver {
 		if(DataFileReader.getNumberOfRecordsOnDisk()==0)
 		{
 			DataFileReader.writeNRecs(NUM_RECS);
+			DataFileReader.initialise();
 		}
 		else {
-			NUM_RECS = (int) DataFileReader.getNumberOfRecordsOnDisk();
+			DataFileReader.initialise();
+			NUM_RECS = (int) DataFileReader.getNumberOfRecords();
 		}
-		DataFileReader.initialise();
 		buildTree();
 		try {
 			writeTreeToFile();
@@ -259,35 +260,20 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 	 */
 	private static final long serialVersionUID = -264095136088478702L;
 
-	private static final int DEFAULT_PARAMETER = 10;
-	private int param;	// BPlus tree parameter, that is variable
-	private Node root;
-
-	public BPlusTree() {
-		this(DEFAULT_PARAMETER);
-	}
-
-	public BPlusTree(int branchingFactor) {
-		if (branchingFactor <= 2)
-			throw new IllegalArgumentException("Branching factor cannot be less than 3");
-		this.param = branchingFactor;
-		root = new LeafNode();
-	}
-
 	public T search(K key) {
-		return root.getValue(key);
+		return root.get_Val(key);
 	}
-
+	
 	public List<T> searchRange(K key1, K key2) {
 		return root.getRange(key1, key2);
 	}
 	
 	public void insert(K key, T value) {
-		root.insertValue(key, value);
+		root.ins_Val(key, value);
 	}
 	
 	public void delete(K key) {
-		root.deleteValue(key);
+		root.del_Val(key);
 	}
 	
 	private abstract class Node implements Serializable{
@@ -316,30 +302,41 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		int keyNum() {
 			return keys.size();
 		}
-
-		abstract T getValue(K key);
-
-		abstract void deleteValue(K key);
-
-		abstract void insertValue(K key, T value);
-
-		abstract K getFirstLeafKey();
-
-		abstract List<T> getRange(K key1, K key2);
-
-		abstract void merge(Node sibling);
-
-		abstract Node split();
-
-		abstract boolean isOverflow();
-
-		abstract boolean isUnderflow();
-
+		
 		public String toString() {
 			return keys.toString();
 		}
+
+		abstract T get_Val(K key);	abstract void del_Val(K key);
+
+		abstract void ins_Val(K key, T value);
+		
+		abstract List<T> getRange(K key1, K key2);	abstract K getFirst_Leaf_Key();
+
+		abstract void merge(Node sibling);		abstract Node split();
+
+		abstract boolean check_Upper_Limit();	abstract boolean check_Lower_Limit();
+	}
+	
+	private Node root;
+	private int param=10;	// BPlus tree parameter, default value is 10, else variable value initialised by contructor
+
+	public BPlusTree() 
+	{
+		root = new LeafNode();
 	}
 
+	public BPlusTree(int branch_Factor) 
+	{
+		if(branch_Factor>=3)
+		{
+			param = branch_Factor;
+			root = new LeafNode();
+		}
+		else
+			throw new IllegalArgumentException("Branching factor cannot be less than 3");
+	}
+	
 	private class InternalNode extends Node {
 		/**
 		 * 
@@ -348,33 +345,81 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		List<Node> children;
 
 		InternalNode() {
-			this.keys = new ArrayList<K>();
-			this.children = new ArrayList<Node>();
+			keys = new ArrayList<K>();
+			children = new ArrayList<Node>();
+		}
+
+		Node get_Child(K key) {
+			int loc = Collections.binarySearch(keys,key);
+			int childIndex;
+			if(loc>=0)
+				childIndex=loc+1;
+			else
+				childIndex=-loc-1;
+			return children.get(childIndex);
+		}
+		
+		void delete_Child(K key) {
+			int loc = Collections.binarySearch(keys,key);
+			if (loc >= 0) {
+				keys.remove(loc);
+				children.remove(loc + 1);
+			}
+		}
+
+		void insertChild(K key, Node child) {
+			int loc = Collections.binarySearch(keys,key);
+			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
+			if (loc < 0) {
+				keys.add(childIndex, key);
+				children.add(childIndex + 1, child);
+			} 
+			else {
+				children.set(childIndex, child);
+			}
+		}
+
+		Node getChildLeftSibling(K key) {
+			int loc = Collections.binarySearch(keys,key);
+			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
+			if (childIndex > 0)
+				return children.get(childIndex - 1);
+
+			return null;
+		}
+
+		Node getChildRightSibling(K key) {
+			int loc = Collections.binarySearch(keys,key);
+			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
+			if (childIndex < keyNum())
+				return children.get(childIndex + 1);
+
+			return null;
+		}
+		
+		@Override
+		T get_Val(K key) {
+			return get_Child(key).get_Val(key);
 		}
 
 		@Override
-		T getValue(K key) {
-			return getChild(key).getValue(key);
-		}
-
-		@Override
-		void deleteValue(K key) {
-			Node child = getChild(key);
+		void del_Val(K key) {
+			Node child = get_Child(key);
 			// first handle deletion at the leaf levels
-			child.deleteValue(key);
+			child.del_Val(key);
 			
 			// check if underflow after deletion
-			if (child.isUnderflow()) {
+			if (child.check_Lower_Limit()) {
 				Node childLeftSibling = getChildLeftSibling(key);
 				Node childRightSibling = getChildRightSibling(key);
 				Node left = childLeftSibling != null ? childLeftSibling : child;
 				Node right = childLeftSibling != null ? child
 						: childRightSibling;
 				left.merge(right);
-				deleteChild(right.getFirstLeafKey());
-				if (left.isOverflow()) {
+				delete_Child(right.getFirst_Leaf_Key());
+				if (left.check_Upper_Limit()) {
 					Node sibling = left.split();
-					insertChild(sibling.getFirstLeafKey(), sibling);
+					insertChild(sibling.getFirst_Leaf_Key(), sibling);
 				}
 				if (root.keyNum() == 0)
 					root = left;
@@ -382,17 +427,17 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		void insertValue(K key, T value) {
-			Node child = getChild(key);
-			child.insertValue(key, value);
-			if (child.isOverflow()) {
+		void ins_Val(K key, T value) {
+			Node child = get_Child(key);
+			child.ins_Val(key, value);
+			if (child.check_Upper_Limit()) {
 				Node sibling = child.split();
-				insertChild(sibling.getFirstLeafKey(), sibling);
+				insertChild(sibling.getFirst_Leaf_Key(), sibling);
 			}
-			if (root.isOverflow()) {
+			if (root.check_Upper_Limit()) {
 				Node sibling = split();
 				InternalNode newRoot = new InternalNode();
-				newRoot.keys.add(sibling.getFirstLeafKey());
+				newRoot.keys.add(sibling.getFirst_Leaf_Key());
 				newRoot.children.add(this);
 				newRoot.children.add(sibling);
 				root = newRoot;
@@ -400,19 +445,19 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		K getFirstLeafKey() {
-			return children.get(0).getFirstLeafKey();
+		K getFirst_Leaf_Key() {
+			return children.get(0).getFirst_Leaf_Key();
 		}
 
 		@Override
 		List<T> getRange(K key1, K key2) {
-			return getChild(key1).getRange(key1, key2);
+			return get_Child(key1).getRange(key1, key2);
 		}
 
 		@Override
 		void merge(Node sibling) {
 			InternalNode node = (InternalNode) sibling;
-			keys.add(node.getFirstLeafKey());
+			keys.add(node.getFirst_Leaf_Key());
 			keys.addAll(node.keys);
 			children.addAll(node.children);
 
@@ -434,58 +479,18 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		boolean isOverflow() {
+		boolean check_Upper_Limit() {
 			return children.size() > param;
 		}
 
 		@Override
-		boolean isUnderflow() {
+		boolean check_Lower_Limit() {
 			return children.size() < (param + 1) / 2;
 		}
 
-		Node getChild(K key) {
-//			int loc = Collections.binarySearch(keys,key);
-			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			return children.get(childIndex);
-		}
+		
 
-		void deleteChild(K key) {
-			int loc = Collections.binarySearch(keys,key);
-			if (loc >= 0) {
-				keys.remove(loc);
-				children.remove(loc + 1);
-			}
-		}
-
-		void insertChild(K key, Node child) {
-			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			if (loc >= 0) {
-				children.set(childIndex, child);
-			} else {
-				keys.add(childIndex, key);
-				children.add(childIndex + 1, child);
-			}
-		}
-
-		Node getChildLeftSibling(K key) {
-			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			if (childIndex > 0)
-				return children.get(childIndex - 1);
-
-			return null;
-		}
-
-		Node getChildRightSibling(K key) {
-			int loc = Collections.binarySearch(keys,key);
-			int childIndex = loc >= 0 ? loc + 1 : -loc - 1;
-			if (childIndex < keyNum())
-				return children.get(childIndex + 1);
-
-			return null;
-		}
+		
 	}
 
 	private class LeafNode extends Node {
@@ -502,13 +507,13 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		T getValue(K key) {
+		T get_Val(K key) {
 			int loc = Collections.binarySearch(keys,key);
 			return loc >= 0 ? values.get(loc) : null;
 		}
 
 		@Override
-		void deleteValue(K key) {
+		void del_Val(K key) {
 			int loc = Collections.binarySearch(keys,key);
 			if (loc >= 0) {
 				keys.remove(loc);
@@ -517,7 +522,7 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		void insertValue(K key, T value) {
+		void ins_Val(K key, T value) {
 			int loc = Collections.binarySearch(keys,key);
 			int valueIndex = loc >= 0 ? loc : -loc - 1;
 			if (loc >= 0) {
@@ -526,10 +531,10 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 				keys.add(valueIndex, key);
 				values.add(valueIndex, value);
 			}
-			if (root.isOverflow()) {
+			if (root.check_Upper_Limit()) {
 				Node sibling = split();
 				InternalNode newRoot = new InternalNode();
-				newRoot.keys.add(sibling.getFirstLeafKey());
+				newRoot.keys.add(sibling.getFirst_Leaf_Key());
 				newRoot.children.add(this);
 				newRoot.children.add(sibling);
 				root = newRoot;
@@ -537,7 +542,7 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		K getFirstLeafKey() {
+		K getFirst_Leaf_Key() {
 			return keys.get(0);
 		}
 
@@ -585,12 +590,12 @@ class BPlusTree<K extends Comparable<K>, T> implements Serializable {
 		}
 
 		@Override
-		boolean isOverflow() {
+		boolean check_Upper_Limit() {
 			return values.size() > param - 1;
 		}
 
 		@Override
-		boolean isUnderflow() {
+		boolean check_Lower_Limit() {
 			return values.size() < param / 2;
 		}
 	}
@@ -705,17 +710,6 @@ class DataFileReader {
 	{
 		data.get(offset).validityTag = "0000";
 	}
-	
-	public static void main(String[] args) {
-		
-		try {
-			writeNRecs(5);
-		} catch (FileNotFoundException | UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
-		System.out.println(new DataNode(readNthRecord(2)));
-	}
-
 }
 
 class DataNode {
@@ -805,3 +799,4 @@ class DataNode {
 		return String.format("%010d",salary);
 	}
 }
+
